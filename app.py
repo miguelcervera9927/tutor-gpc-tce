@@ -8,6 +8,7 @@ from langchain_community.vectorstores import Chroma
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
 
@@ -82,19 +83,38 @@ if api_key:
         def format_docs(docs):
             return "\n\n".join(doc.page_content for doc in docs)
 
-        chain = (
-            {"context": retriever | format_docs, "input": RunnablePassthrough(), "history": lambda x: msgs.messages}
-            | prompt
-            | llm
-            | StrOutputParser()
+        # --- NUEVA ESTRUCTURA DE CADENA ---
+        
+        # 1. Definimos la parte que recupera y organiza los datos iniciales
+        setup_and_retrieval = RunnableParallel( # <-- ¡Aquí se usa!
+            {"context": retriever, "input": RunnablePassthrough(), "history": lambda x: msgs.messages}
         )
+
+        # 2. Función interna para procesar la respuesta manteniendo los documentos
+        def generar_respuesta_con_contexto(data):
+            # Extraemos los documentos crudos para guardarlos
+            docs_crudos = data["context"]
+            # Los formateamos como texto para que el prompt los entienda
+            contexto_formateado = format_docs(docs_crudos)
+            
+            # Ejecutamos el flujo del modelo
+            respuesta_texto = (prompt | llm | StrOutputParser()).invoke({
+                "context": contexto_formateado,
+                "input": data["input"],
+                "history": data["history"]
+            })
+            
+            # Devolvemos el diccionario exacto que tu código espera abajo
+            return {"answer": respuesta_texto, "context": docs_crudos}
+
+        # La cadena final une ambos pasos
+        chain = setup_and_retrieval | generar_respuesta_con_contexto
 
         for msg in msgs.messages:
             st.chat_message(msg.type).write(msg.content)
 
         if user_input := st.chat_input("Escribe tu análisis clínico..."):
             st.chat_message("human").write(user_input)
-            
             with st.spinner("Analizando la GPC..."):
                 # 1. Invocamos la cadena. LangChain suele devolver un diccionario aquí.
                 respuesta_completa = chain.invoke(user_input)
