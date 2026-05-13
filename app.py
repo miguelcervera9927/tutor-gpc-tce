@@ -59,7 +59,7 @@ if api_key:
     retriever = configurar_cerebro()
     
     if retriever:
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.1)
+        llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1)
         msgs = StreamlitChatMessageHistory(key="chat_history")
         
         prompt = ChatPromptTemplate.from_messages([
