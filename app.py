@@ -19,7 +19,7 @@ st.set_page_config(page_title="Tutor GPC TCE", page_icon="🩺", layout="centere
 
 st.title("🧠 Tutor Socrático: GPC TCE Pediátrico")
 st.markdown("""
-Esta herramienta evalúa el razonamiento clínico basado en la **GPC de CENETEC**. 
+Esta herramienta evalúa el razonamiento clínico basado en la **GPC de CENETEC**. Di "Hola" para iniciar el caso clínico. Recuerda: el tutor solo guiará tu análisis, no te dará respuestas directas. ¡Buena suerte! 
 """)
 
 # --- PROCESAMIENTO DEL CONOCIMIENTO (RAG) ---
@@ -66,10 +66,13 @@ if api_key:
                 "Eres un tutor experto en neurocirugía pediátrica. Tu misión es guiar al estudiante "
                 "en la resolución de casos de TCE basándote ÚNICAMENTE en la GPC proporcionada.\n\n"
                 "METODOLOGÍA:\n"
-                "1. Plantea el caso por etapas. No des la solución.\n"
-                "2. Evalúa la respuesta del estudiante. Si hay errores de interpretación o asignación, "
+                "Plantea el caso por etapas. No des la solución.\n"
+                "Evalúa la respuesta del estudiante. Si hay errores de interpretación o asignación, "
                 "corrígelos citando la GPC.\n"
-                "3. Mantén un tono profesional.\n\n"
+                "NUNCA le des el diagnóstico o el tratamiento directo al alumno en la primera respuesta.\n"
+                "Si el alumno omite calcular la Escala de Coma de Glasgow, pregúntale por ella antes de avanzar.\n"
+                "Usa la técnica de 'Scaffolding' (Andamiaje): si el alumno se equivoca en la indicación de una TAC de cráneo según la GPC, no le digas la respuesta; hazle una pregunta guiada para que él mismo descubra su error.\n"
+                "Mantén un tono profesional.\n\n"
                 "Contexto de la GPC:\n{context}"
             )),
             MessagesPlaceholder(variable_name="history"),
@@ -93,10 +96,28 @@ if api_key:
             st.chat_message("human").write(user_input)
             
             with st.spinner("Analizando la GPC..."):
-                response = chain.invoke(user_input)
-                st.chat_message("assistant").write(response)
+                # 1. Invocamos la cadena. LangChain suele devolver un diccionario aquí.
+                respuesta_completa = chain.invoke(user_input)
+                # OJO AQUÍ: Dependiendo de cómo armaste tu "chain" arriba, 
+                # las llaves del diccionario suelen llamarse "answer" y "context" 
+                # (o a veces "result" y "source_documents").
+                texto_respuesta = respuesta_completa["answer"]
+                documentos_fuente = respuesta_completa["context"]
+                # 2. Mostramos el mensaje del asistente
+                with st.chat_message("assistant"):
+                    st.write(texto_respuesta)
+                    # 3. Agregamos el botón desplegable con la evidencia
+                    if documentos_fuente:
+                        with st.expander("🔍 Ver evidencia clínica en la GPC"):
+                            for i, doc in enumerate(documentos_fuente):
+                                # Intentamos sacar el número de página si PyMuPDF lo guardó
+                                pagina = doc.metadata.get("page", "N/A")
+                                st.markdown(f"**Fragmento extraído {i+1} (Página {pagina}):**")
+                                st.info(doc.page_content)
+                # 4. Guardamos en el historial SOLO el texto (no los documentos) 
+                # para no saturar la memoria de la conversación
                 msgs.add_user_message(user_input)
-                msgs.add_ai_message(response)
+                msgs.add_ai_message(texto_respuesta)
 else:
     st.info("👋 Por favor, ingresa tu API Key para comenzar.")
 
