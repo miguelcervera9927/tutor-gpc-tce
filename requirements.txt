@@ -4,6 +4,6 @@ langchain
 langchain-community
 langchain-groq
 langchain-huggingface
-pypdf
+pymupdf
 chromadb
 sentence-transformers
