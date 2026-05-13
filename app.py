@@ -62,7 +62,7 @@ if api_key:
         llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0.1)
         msgs = StreamlitChatMessageHistory(key="chat_history")
         
-      prompt = ChatPromptTemplate.from_messages([
+        prompt = ChatPromptTemplate.from_messages([
             ("system", (
                 "Adopta el rol de un Médico Adjunto estricto y evaluador en urgencias pediátricas. "
                 "Tu tarea es evaluar a un residente (el usuario) usando la GPC de CENETEC sobre TCE Pediátrico.\n\n"
@@ -93,31 +93,20 @@ if api_key:
         def format_docs(docs):
             return "\n\n".join(doc.page_content for doc in docs)
 
-        # --- NUEVA ESTRUCTURA DE CADENA ---
-        
-        # 1. Definimos la parte que recupera y organiza los datos iniciales
-        setup_and_retrieval = RunnableParallel( # <-- ¡Aquí se usa!
+        setup_and_retrieval = RunnableParallel(
             {"context": retriever, "input": RunnablePassthrough(), "history": lambda x: msgs.messages}
         )
 
-        # 2. Función interna para procesar la respuesta manteniendo los documentos
         def generar_respuesta_con_contexto(data):
-            # Extraemos los documentos crudos para guardarlos
             docs_crudos = data["context"]
-            # Los formateamos como texto para que el prompt los entienda
             contexto_formateado = format_docs(docs_crudos)
-            
-            # Ejecutamos el flujo del modelo
             respuesta_texto = (prompt | llm | StrOutputParser()).invoke({
                 "context": contexto_formateado,
                 "input": data["input"],
                 "history": data["history"]
             })
-            
-            # Devolvemos el diccionario exacto que tu código espera abajo
             return {"answer": respuesta_texto, "context": docs_crudos}
 
-        # La cadena final une ambos pasos
         chain = setup_and_retrieval | generar_respuesta_con_contexto
 
         for msg in msgs.messages:
