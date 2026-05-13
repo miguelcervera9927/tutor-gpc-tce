@@ -44,7 +44,11 @@ def configurar_cerebro():
 
 # --- LÓGICA DEL TUTOR ---
 # Intenta obtener la clave desde el archivo .env o la barra lateral
-api_key = os.getenv("GROQ_API_KEY")
+# Intenta obtener la clave de Streamlit Secrets (Nube) o de .env (Local)
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+except:
+    api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
     api_key = st.sidebar.text_input("Ingresa tu Groq API Key (o configúrala en .env)", type="password")
